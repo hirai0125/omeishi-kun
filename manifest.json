@@ -1,0 +1,14 @@
+{
+  "name": "お名刺くん",
+  "short_name": "お名刺くん",
+  "description": "名刺を撮影して会社名・氏名などを整理する名刺管理アプリ（画像は保存しません）",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f8fb",
+  "theme_color": "#1f4e79",
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+  ]
+}
