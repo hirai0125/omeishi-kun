@@ -380,6 +380,7 @@ function today(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth
 
 /* ---------- 画面切替 ---------- */
 function show(v){
+  if(v==='list'&&!$('#v-list').classList.contains('on')){openComps.clear();renderList()}
   document.querySelectorAll('.view').forEach(e=>e.classList.toggle('on',e.id==='v-'+v));
   document.querySelectorAll('nav button[data-v]').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
   if(v==='list'||v==='set'||v==='map')lastView=v;
@@ -521,8 +522,8 @@ function colorOf(c){
   let h=0;for(const ch of k)h=(h*31+ch.charCodeAt(0))>>>0;  // 会社名から自動で決める（どの端末でも同じ色）
   return PALETTE[h%PALETTE.length];
 }
-function folded(){try{return new Set(JSON.parse(localStorage.getItem(FOLDKEY))||[])}catch(e){return new Set()}}
-function setFolded(set){localStorage.setItem(FOLDKEY,JSON.stringify([...set]))}
+// トップは常に会社ごと折りたたみで始まる。開いた会社だけ一時的に覚える（トップに戻るとまた閉じる）
+let openComps=new Set();
 const tint=(hex,a)=>{const n=parseInt(hex.slice(1),16);return `rgba(${n>>16},${(n>>8)&255},${n&255},${a})`};
 
 function itemHtml(c,s){
@@ -547,7 +548,6 @@ function renderList(){
   $('#fold-bar').classList.toggle('hidden',s!=='company'||!arr.length);
   if(!cards.length){renderShelf();box.innerHTML='<div class="empty">まだ名刺がありません。<br>上の「📷 名刺を撮影する」から登録してください。</div>';return}
   if(!arr.length){renderShelf();box.innerHTML='<div class="empty">該当する名刺がありません</div>';return}
-  const fd=folded();
   let html='',grp=null,sub=null,open=false;
   const close=()=>{if(open){html+='</div></div>';open=false}};
   arr.forEach(c=>{
@@ -558,7 +558,7 @@ function renderList(){
       const ck=compKey(c);
       if(ck!==sub){
         close();sub=ck;
-        const n=arr.filter(x=>compKey(x)===ck).length,col=colorOf(c),isF=!q&&fd.has(ck);
+        const n=arr.filter(x=>compKey(x)===ck).length,col=colorOf(c),isF=!q&&!openComps.has(ck);
         html+=`<div class="cgroup${isF?' folded':''}" data-ck="${esc(ck)}" style="--cc:${col}">
           <div class="chead" style="background:${tint(col,.12)};border-left-color:${col}">
             <span class="carr">${isF?'▶':'▼'}</span>
@@ -584,8 +584,8 @@ function renderList(){
     const ck=gr.dataset.ck;
     gr.querySelector('.chead').onclick=ev=>{
       if(ev.target.closest('.cdot')){gr.querySelector('.cpal').classList.toggle('hidden');return}
-      const f=folded();gr.classList.toggle('folded');
-      if(gr.classList.contains('folded'))f.add(ck);else f.delete(ck);setFolded(f);
+      gr.classList.toggle('folded');
+      if(gr.classList.contains('folded'))openComps.delete(ck);else openComps.add(ck);
       gr.querySelector('.carr').textContent=gr.classList.contains('folded')?'▶':'▼';
     };
     gr.querySelectorAll('.cpal button').forEach(b=>b.onclick=()=>{
@@ -595,8 +595,8 @@ function renderList(){
   });
   renderShelf(groups);
 }
-$('#fold-all').onclick=()=>{setFolded(new Set(cards.map(compKey)));renderList()};
-$('#open-all').onclick=()=>{setFolded(new Set());renderList()};
+$('#fold-all').onclick=()=>{openComps.clear();renderList()};
+$('#open-all').onclick=()=>{openComps=new Set(cards.map(compKey));renderList()};
 document.querySelectorAll('#sort button').forEach(b=>b.onclick=()=>{
   sortMode=b.dataset.s;localStorage.setItem('meishi-kun-sort',sortMode);renderList();
 });
@@ -1743,7 +1743,8 @@ async function syncNow(quiet){
     const d=dels();
     const payload=cards.map(x=>({...x,deleted:''})).concat(Object.entries(d).map(([id,t])=>({id,updated:t,deleted:'1'})));
     const r=await fetch(c.url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({key:c.key||'',cards:payload})});
-    const j=await r.json();
+    const txt=await r.text();let j;
+    try{j=JSON.parse(txt)}catch(_){throw new Error('Apps Scriptの公開設定を確認してください（デプロイの「アクセスできるユーザー」を「全員」にして、新バージョンでデプロイ）')}
     if(!j.ok)throw new Error(j.error||'同期に失敗しました');
     // サーバーで統合された内容に置き換える
     const nd={},nc=[];
@@ -1762,7 +1763,7 @@ async function syncNow(quiet){
     setSyState(`✅ 同期しました（${new Date(c.last).toLocaleString('ja-JP')}／${cards.length}枚）`);
     if(!quiet)toast('同期しました');
     if(!editingNow)setTimeout(geoQueue,500);
-  }catch(e){console.error(e);setSyState('⚠ 同期できませんでした：'+(e.message||'通信エラー'));if(!quiet)toast('同期できませんでした')}
+  }catch(e){console.error(e);const m=e instanceof TypeError?'URLにつながりません。①URLが「/exec」で終わっているか ②デプロイの「アクセスできるユーザー」が「全員」になっているか を確認してください':(e.message||'通信エラー');setSyState('⚠ 同期できませんでした：'+m);if(!quiet)toast('同期できませんでした')}
   finally{syncing=false;if(syncAgain){syncAgain=false;scheduleSync(1000)}}
 }
 function setSyState(t){$('#sy-state').textContent=t}

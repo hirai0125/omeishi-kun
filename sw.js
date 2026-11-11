@@ -1,5 +1,5 @@
 // お名刺くん Service Worker：アプリ本体と読み取りエンジンをキャッシュ
-const CACHE = 'meishi-kun-v28';
+const CACHE = 'meishi-kun-v30';
 const CORE = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
